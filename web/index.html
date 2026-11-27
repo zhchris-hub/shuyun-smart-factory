@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111921">
+  <title>蜀云智造 · 智慧工厂管控平台</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script defer src="/assets/vendor/echarts.min.js"></script>
+  <script defer src="/assets/app.js"></script>
+  <script defer src="/assets/workflows.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主内容</a>
+  <section id="signin" class="signin" hidden>
+    <div class="signin-card">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>蜀云智造</div>
+      <h1>登录工厂管控台</h1>
+      <form id="login-form" class="form-stack">
+        <label>账户<input name="username" autocomplete="username" required maxlength="24" placeholder="admin / operator / viewer"></label>
+        <label>密码<input name="password" type="password" autocomplete="current-password" required maxlength="300"></label>
+        <p id="login-error" class="form-message" role="alert" hidden></p>
+        <button type="submit" class="button primary">登录</button>
+        <button type="button" class="button" id="demo-login" hidden>以操作员进入模拟演示</button>
+      </form>
+    </div>
+  </section>
+
+  <div class="shell" id="app" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="#monitor" aria-label="蜀云智造实时监控">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>蜀云智造<small>工厂管控台</small></span>
+      </a>
+      <nav class="nav" aria-label="功能导航">
+        <a href="#monitor" data-nav="monitor">实时监控</a>
+        <a href="#devices" data-nav="devices">设备与控制</a>
+        <a href="#business" data-nav="business">业务台账</a>
+        <a href="#workbench" data-nav="workbench" data-control hidden>运营工作台</a>
+        <a href="#orders" data-nav="orders">告警工单 <span id="nav-alerts" hidden></span></a>
+        <a href="#records" data-nav="records">记录与报告</a>
+        <a href="#screen" data-nav="screen">管理大屏</a>
+        <a href="#rules" data-nav="rules" data-admin hidden>阈值配置</a>
+        <a href="#tools" data-nav="tools" data-admin hidden>模型与工具</a>
+      </nav>
+      <div class="account">
+        <div><strong id="account-name"></strong><small id="account-id"></small></div>
+        <button class="button quiet" id="logout" type="button">退出</button>
+      </div>
+    </aside>
+
+    <main id="main">
+      <header class="topline">
+        <div class="connection">
+          <span id="connection-label" class="status" data-tone="neutral">正在连接</span>
+          <span id="mode-label" class="mode-label"></span>
+        </div>
+        <time id="clock" aria-label="北京时间"></time>
+      </header>
+
+      <div class="main-content">
+        <div class="page-heading">
+          <h1 id="page-title">实时监控</h1>
+          <label id="device-picker">终端<select id="device-select" aria-label="终端"></select></label>
+        </div>
+
+        <section data-page="monitor">
+          <div id="device-state" class="device-line"></div>
+          <div class="metrics" id="metrics" aria-label="实时环境读数"></div>
+          <div class="monitor-grid">
+            <section class="panel trends" aria-labelledby="trend-heading">
+              <div class="section-head">
+                <h2 id="trend-heading">环境趋势</h2>
+                <select id="trend-window" aria-label="趋势时间范围">
+                  <option value="5">近 5 分钟</option>
+                  <option value="10" selected>近 10 分钟</option>
+                  <option value="30">近 30 分钟</option>
+                  <option value="60">近 60 分钟</option>
+                </select>
+              </div>
+              <div id="trend-chart" class="chart" role="img" aria-label="温度与湿度按采样时间变化趋势"></div>
+              <p id="trend-empty" class="empty chart-empty" hidden>等待设备上报温湿度。</p>
+            </section>
+            <section class="panel assistant" aria-labelledby="assistant-heading">
+              <div class="section-head">
+                <div><h2 id="assistant-heading">值班智能体</h2><div id="model-label" class="muted"></div></div>
+                <select id="agent-select" aria-label="值班智能体角色"></select>
+              </div>
+              <div class="chat-log" id="chat-log" role="log" aria-label="问数结果" aria-live="polite">
+                <p class="muted">选择终端后，可以查询实时读数或准备一条控制指令。</p>
+              </div>
+              <div class="prompts" id="prompts"></div>
+              <form id="ask-form" class="chat-input">
+                <input id="question" aria-label="输入现场问题" placeholder="输入现场问题" autocomplete="off" required maxlength="360">
+                <button class="button primary" type="submit">发送</button>
+              </form>
+              <div class="assistant-actions" data-control>
+                <button type="button" class="button quiet" id="chat-handoff" disabled>转人工</button>
+              </div>
+            </section>
+          </div>
+
+          <div class="monitor-grid lower">
+            <section class="panel" aria-labelledby="alarms-heading">
+              <div class="section-head"><h2 id="alarms-heading">未关闭告警</h2><a href="#orders">查看工单</a></div>
+              <div id="recent-alerts"></div>
+            </section>
+            <section class="panel" aria-labelledby="events-heading">
+              <div class="section-head"><h2 id="events-heading">近期事件</h2><a href="#records">查记录</a></div>
+              <div id="recent-events"></div>
+            </section>
+          </div>
+        </section>
+
+        <section data-page="business" hidden>
+          <section class="panel">
+            <div class="section-head">
+              <h2>产量与库存</h2>
+              <label class="date-control">日期<input id="business-day" type="date" required></label>
+            </div>
+            <div id="business-totals" class="inline-metrics"></div>
+            <div id="business-list"></div>
+          </section>
+          <section class="panel section-gap" data-control>
+            <div class="section-head"><h2>台账登记</h2></div>
+            <form id="business-form" class="fields">
+              <label>业务类型<select name="kind">
+                <option value="production">产线产量</option><option value="inventory">仓库库存</option>
+              </select></label>
+              <label>产线或物料编号<input name="code" required maxlength="48" placeholder="装配线或 FIN-021"></label>
+              <label>名称<input name="label" required maxlength="64"></label>
+              <label>件数<input name="quantity" type="number" min="0" max="100000000" step="1" required></label>
+              <label class="span-all">数据来源<input name="source" required minlength="2" maxlength="160" placeholder="当天班报、盘点记录或业务系统"></label>
+              <button class="button primary" type="submit">保存台账</button>
+            </form>
+          </section>
+        </section>
+
+        <section data-page="workbench" hidden>
+          <div class="monitor-grid">
+            <section class="panel">
+              <div class="section-head"><h2>处置建议</h2><button type="button" class="button quiet" id="refresh-decisions">刷新</button></div>
+              <div id="decision-list"></div>
+            </section>
+            <section class="panel">
+              <div class="section-head"><h2>人工接办</h2><button type="button" class="button" id="create-handoff">发起转人工</button></div>
+              <div id="handoff-list"></div>
+            </section>
+          </div>
+
+          <section class="panel section-gap">
+            <div class="section-head"><h2>通行核验</h2><span id="gate-state" class="muted"></span></div>
+            <div id="access-forms" class="workflow-columns">
+              <form id="issue-pass" class="form-stack">
+                <label>安全通道<select name="device_id" id="gate-device" required></select></label>
+                <label>通行用途<input name="purpose" required maxlength="96" minlength="2" placeholder="例如当班巡检"></label>
+                <label>有效分钟<input name="minutes" type="number" min="1" max="30" value="5" required></label>
+                <div><button class="button primary" type="submit">签发一次性通行码</button></div>
+                <output id="issued-code" class="issued-code" aria-live="polite" hidden></output>
+              </form>
+              <form id="verify-pass" class="form-stack">
+                <label>通行码<input name="code" required minlength="16" maxlength="32" autocomplete="off" spellcheck="false"></label>
+                <div><button class="button" type="submit">核验通行码</button></div>
+                <p class="muted" id="gate-mode"></p>
+              </form>
+            </div>
+            <div id="pass-list" class="table-gap"></div>
+          </section>
+        </section>
+
+        <section data-page="devices" hidden>
+          <div class="device-list" id="device-list" aria-label="登记终端"></div>
+          <div class="monitor-grid">
+            <section class="panel">
+              <div class="section-head"><h2>执行器</h2><span id="control-status"></span></div>
+              <div class="output-list" id="output-list"></div>
+              <form id="control-form" class="control-form" data-control>
+                <label>执行器<select name="actuator" id="actuator" required></select></label>
+                <label id="target-label">目标值<input name="value" id="target-value" type="number" min="0" max="100" step="1" value="100" required></label>
+                <button class="button primary" type="submit">预览指令</button>
+              </form>
+            </section>
+            <section class="panel" id="demo-controls" hidden>
+              <div class="section-head"><h2>模拟场景</h2></div>
+              <div class="scenario-list" id="scenario-list"></div>
+              <p class="muted">场景变化通过同一设备协议上报，大约两秒后反映在读数和告警中。</p>
+            </section>
+          </div>
+          <section class="panel section-gap">
+            <div class="section-head"><h2>指令与回执</h2></div>
+            <div id="command-log"></div>
+          </section>
+        </section>
+
+        <section data-page="orders" hidden>
+          <section class="panel">
+            <div class="section-head">
+              <h2>告警处置</h2>
+              <label class="check"><input id="include-closed" type="checkbox">显示已关闭</label>
+            </div>
+            <div id="order-list"></div>
+          </section>
+        </section>
+
+        <section data-page="records" hidden>
+          <section class="panel">
+            <div class="section-head"><h2>Word 报告</h2></div>
+            <form id="report-form" class="report-form">
+              <label>统计日期<input id="report-date" type="date" required></label>
+              <label>设备范围<select id="report-device" aria-label="报告设备范围"><option value="">所有登记设备</option></select></label>
+              <button class="button primary" name="inspection" type="submit">下载巡检报告</button>
+              <button class="button" name="energy" type="submit">下载能耗报告</button>
+            </form>
+          </section>
+          <section class="panel section-gap">
+            <div class="section-head"><h2>查询留痕</h2></div>
+            <form id="record-form" class="report-form">
+              <label>记录类型<select id="record-kind">
+                <option value="events">设备和通行事件</option>
+                <option value="alerts">告警</option>
+                <option value="commands">控制指令</option>
+                <option value="conversations">问数会话</option>
+                <option value="passes" data-control hidden>通行核验</option>
+                <option value="audit" data-admin hidden>操作审计</option>
+              </select></label>
+              <label>关键字<input id="record-query" placeholder="设备 ID、内容或状态" maxlength="120"></label>
+              <button class="button" type="submit">查询</button>
+            </form>
+            <div id="record-results" class="table-gap"></div>
+          </section>
+        </section>
+
+        <section data-page="screen" hidden>
+          <div class="screen-controls"><span>汇总视图 · UTC+08:00</span><button class="button quiet" id="fullscreen" type="button">全屏</button></div>
+          <div class="metrics" id="screen-metrics" aria-label="当日聚合指标"></div>
+          <div id="screen-business" class="inline-metrics" aria-label="当日业务汇总"></div>
+          <section class="panel section-gap">
+            <div class="section-head"><h2>当日分时能耗估算</h2><span id="screen-date" class="muted"></span></div>
+            <div id="energy-chart" class="chart tall" role="img" aria-label="全天分时用电估算柱状图"></div>
+            <p id="energy-note" class="muted"></p>
+          </section>
+        </section>
+
+        <section data-page="tools" hidden>
+          <div class="monitor-grid">
+            <section class="panel">
+              <div class="section-head"><h2>模型问数测试</h2><span id="configured-model" class="muted"></span></div>
+              <form id="model-test" class="form-stack">
+                <label>拟测试的问题<input name="text" placeholder="今天装配线跑了多少件？" required maxlength="360"></label>
+                <label class="check"><input name="compare" id="model-compare" type="checkbox">对比已配置模型</label>
+                <div class="fields price-fields" id="model-rates" hidden>
+                  <label>输入单价 元/百万 token<input name="input_rate" type="number" min="0" max="10000" step="any" placeholder="按所用套餐填写"></label>
+                  <label>输出单价 元/百万 token<input name="output_rate" type="number" min="0" max="10000" step="any" placeholder="按所用套餐填写"></label>
+                </div>
+                <div><button class="button primary" type="submit">运行问数测试</button></div>
+              </form>
+              <div id="model-result" class="table-gap" aria-live="polite"></div>
+            </section>
+            <section class="panel">
+              <div class="section-head"><h2>只读工具测试</h2></div>
+              <form id="skill-test" class="form-stack">
+                <label>连接方式<select name="transport" id="skill-transport" aria-label="连接方式">
+                  <option value="http">HTTP 函数</option><option value="local">本机 MCP</option>
+                </select></label>
+                <label>工具<select name="name" id="skill-name" aria-label="工具" required></select></label>
+                <label id="skill-date-label">统计日期<input type="date" name="day" id="skill-day"></label>
+                <div><button class="button" type="submit">运行只读工具</button></div>
+              </form>
+              <pre class="tool-result" id="skill-result" tabindex="0" aria-live="polite" hidden></pre>
+            </section>
+          </div>
+          <section class="panel section-gap">
+            <div class="section-head"><h2>岗位提示与常用问法</h2></div>
+            <form id="agent-prompts" class="form-stack">
+              <div class="prompt-fields">
+                <label>设备管家<textarea name="device" rows="3" maxlength="504" required></textarea></label>
+                <label>安全卫士<textarea name="safety" rows="3" maxlength="504" required></textarea></label>
+                <label>能耗分析师<textarea name="energy" rows="3" maxlength="504" required></textarea></label>
+              </div>
+              <p class="muted">每行一个问题，每个岗位最多五条。</p>
+              <div class="prompt-fields">
+                <label>设备管家岗位提示<textarea name="guide_device" rows="2" maxlength="240"></textarea></label>
+                <label>安全卫士岗位提示<textarea name="guide_safety" rows="2" maxlength="240"></textarea></label>
+                <label>能耗分析师岗位提示<textarea name="guide_energy" rows="2" maxlength="240"></textarea></label>
+              </div>
+              <p class="muted">岗位提示用于已配置模型选择处置建议。</p>
+              <div><button class="button" type="submit">保存常用问法</button></div>
+            </form>
+          </section>
+          <section class="panel section-gap">
+            <div class="section-head"><h2>角色权限</h2></div>
+            <div id="permission-matrix"></div>
+          </section>
+        </section>
+
+        <section data-page="rules" hidden>
+          <section class="panel rules-panel">
+            <div class="section-head"><h2>采样告警阈值</h2></div>
+            <form id="rules-form" class="form-stack">
+              <label>温度上限 °C<input type="number" name="temperature_high" min="1" max="80" step="0.1" required></label>
+              <label>湿度下限 %<input type="number" name="humidity_low" min="0" max="99" step="0.1" required></label>
+              <label>湿度上限 %<input type="number" name="humidity_high" min="1" max="100" step="0.1" required></label>
+              <label>光照下限 ADC<input type="number" name="light_low" min="0" max="4095" step="1" required></label>
+              <button class="button primary" type="submit">保存阈值</button>
+            </form>
+          </section>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+    <h2 id="confirm-title">确认控制指令</h2>
+    <dl id="confirm-detail" class="detail-list"></dl>
+    <p class="muted">确认后，后台会校验设备状态与安全联锁，再向板端下发。</p>
+    <form id="confirm-form" class="dialog-actions">
+      <button type="button" class="button" data-dismiss>取消</button>
+      <button type="submit" class="button primary">人工确认并下发</button>
+    </form>
+  </dialog>
+  <dialog id="close-dialog" aria-labelledby="close-title">
+    <h2 id="close-title">关闭告警工单</h2>
+    <form id="close-form" class="form-stack">
+      <label>处置说明<textarea name="note" required minlength="2" maxlength="160" rows="3"></textarea></label>
+      <div class="dialog-actions">
+        <button class="button" type="button" data-dismiss>取消</button>
+        <button class="button primary" type="submit">记录并关闭</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="workflow-dialog" aria-labelledby="workflow-title">
+    <h2 id="workflow-title"></h2>
+    <p id="workflow-context" class="muted"></p>
+    <form id="workflow-form" class="form-stack">
+      <label id="workflow-note-label">说明<textarea name="note" required minlength="2" maxlength="160" rows="3"></textarea></label>
+      <div class="dialog-actions">
+        <button class="button" type="button" data-dismiss>取消</button>
+        <button class="button primary" type="submit" id="workflow-submit">确认</button>
+      </div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
