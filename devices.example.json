@@ -1,0 +1,9 @@
+[
+  {
+    "id": "esp32-shop-01",
+    "name": "车间采集终端",
+    "domain": "workshop",
+    "token": "replace-with-a-unique-random-token",
+    "outputs": ["led", "buzzer"]
+  }
+]
